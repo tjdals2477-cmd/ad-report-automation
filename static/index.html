@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>광고 리포트 자동화</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="app-header no-print">
+    <a class="brand" href="/" aria-label="광고 리포트 자동화 홈">
+      <span class="brand-mark">AR</span>
+      <span><strong>AD REPORT</strong><small>광고 리포트 자동화</small></span>
+    </a>
+    <div class="header-actions">
+      <button class="button button-ghost" id="sampleButton" type="button">샘플 보기</button>
+      <button class="button button-dark" id="printTopButton" type="button" disabled>PDF로 저장</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="intro no-print" aria-labelledby="intro-title">
+      <p class="eyebrow">WEEKLY / MONTHLY PERFORMANCE</p>
+      <h1 id="intro-title">파일 한 번으로<br>광고 보고서를 완성하세요.</h1>
+      <p class="intro-copy">주간·월간 광고 데이터를 올리면 캠페인과 상품 성과를 자동 집계합니다. 열 이름이 달라도 확인 후 바로 맞출 수 있습니다.</p>
+    </section>
+
+    <section class="builder no-print" aria-label="보고서 생성 설정">
+      <div class="step-card is-active" id="uploadStep">
+        <div class="step-heading">
+          <span class="step-number">01</span>
+          <div><h2>데이터 업로드</h2><p>엑셀 한 개 또는 여러 파일을 함께 올릴 수 있습니다.</p></div>
+        </div>
+        <label class="dropzone" id="dropzone" for="fileInput">
+          <input id="fileInput" type="file" accept=".xlsx,.xlsm,.csv,.tsv,.txt" multiple>
+          <span class="upload-symbol" aria-hidden="true">+</span>
+          <strong>여기에 파일을 놓거나 선택하세요</strong>
+          <small>XLSX, XLSM, CSV, TSV · 최대 30MB</small>
+        </label>
+        <div class="file-list" id="fileList" aria-live="polite"></div>
+        <p class="inline-message" id="uploadMessage" role="status"></p>
+        <button class="button button-primary button-wide" id="inspectButton" type="button" disabled>열 구성 확인</button>
+      </div>
+
+      <div class="step-card" id="mappingStep">
+        <div class="step-heading">
+          <span class="step-number">02</span>
+          <div><h2>데이터 연결</h2><p>자동 선택된 시트와 열을 확인해주세요.</p></div>
+        </div>
+
+        <div class="form-grid report-meta">
+          <label><span>보고서 구분</span><select id="periodType"><option value="weekly">주간</option><option value="monthly" selected>월간</option></select></label>
+          <label><span>대상 기간</span><input id="periodLabel" type="text" placeholder="예: 2026년 8월"></label>
+          <label class="full"><span>보고서 제목</span><input id="reportTitle" type="text" value="광고 성과 리포트"></label>
+        </div>
+
+        <div class="mapping-block">
+          <div class="mapping-title"><h3>캠페인 데이터</h3><span>필수</span></div>
+          <label class="source-select"><span>사용할 시트</span><select id="campaignDataset"></select></label>
+          <div class="form-grid" id="campaignFields"></div>
+        </div>
+
+        <div class="mapping-block">
+          <div class="mapping-title"><h3>상품 데이터</h3><span>필수</span></div>
+          <label class="source-select"><span>사용할 시트</span><select id="productDataset"></select></label>
+          <div class="form-grid" id="productFields"></div>
+        </div>
+
+        <p class="inline-message" id="mappingMessage" role="status"></p>
+        <button class="button button-primary button-wide" id="generateButton" type="button">보고서 생성</button>
+      </div>
+    </section>
+
+    <section class="report-shell" id="reportShell" hidden>
+      <div class="report-toolbar no-print">
+        <div><span class="status-dot"></span><strong>보고서가 준비되었습니다</strong><small id="qualityNote"></small></div>
+        <button class="button button-dark" id="printButton" type="button">PDF로 저장 / 인쇄</button>
+      </div>
+
+      <article class="report" id="report">
+        <header class="report-header">
+          <div>
+            <p class="report-kicker" id="reportKicker">MONTHLY AD PERFORMANCE</p>
+            <h2 id="outputTitle">광고 성과 리포트</h2>
+          </div>
+          <div class="report-period"><span>REPORTING PERIOD</span><strong id="outputPeriod">기간 미지정</strong></div>
+        </header>
+
+        <section class="kpi-grid" aria-label="핵심 지표">
+          <div class="kpi-card"><span>총광고비</span><strong id="totalSpend">0원</strong><small>AD SPEND</small></div>
+          <div class="kpi-card"><span>총매출</span><strong id="totalSales">0원</strong><small>AD SALES</small></div>
+          <div class="kpi-card"><span>전환율</span><strong id="conversionRate">-</strong><small>CONVERSION RATE</small></div>
+          <div class="kpi-card kpi-primary"><span>ROAS</span><strong id="roas">-</strong><small>RETURN ON AD SPEND</small></div>
+        </section>
+
+        <div class="ratio-line">
+          <span>광고 매출 대비 광고비</span>
+          <strong id="spendToSales">-</strong>
+          <small>총광고비 ÷ 총매출</small>
+        </div>
+
+        <section class="report-section">
+          <div class="section-heading"><div><span>01</span><h3>캠페인별 매출 요약</h3></div><p>매출액 기준 내림차순</p></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>캠페인</th><th class="number">광고비</th><th class="number">매출</th><th class="number">전환율</th><th class="number">광고비 비중</th></tr></thead>
+              <tbody id="campaignTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="report-section product-section">
+          <div class="section-heading"><div><span>02</span><h3>판매상품 TOP 10</h3></div><p>매출액 기준 상위 10개 상품</p></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th class="rank">순위</th><th>옵션 ID</th><th>상품명</th><th class="number">매출액</th><th class="number">판매 수량</th></tr></thead>
+              <tbody id="productTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <footer class="report-footer">
+          <span id="sourceNote">Source</span>
+          <span id="generatedAt">Generated</span>
+        </footer>
+      </article>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="alert" aria-live="assertive"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
+

@@ -4,6 +4,10 @@
 
 `streamlit_app.py`는 Streamlit Community Cloud 배포용 진입 파일입니다. GitHub 저장소에 이 폴더의 파일을 올리고 Streamlit에서 해당 파일을 선택하면 `streamlit.app` 주소로 실행할 수 있습니다.
 
+## 온라인 앱
+
+[광고 리포트 자동화 실행하기](https://ad-report-automation.streamlit.app/)
+
 ## 실행
 
 1. `start.bat`을 더블클릭합니다.

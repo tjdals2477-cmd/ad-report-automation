@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from report_engine import Dataset, build_report, read_upload
 
@@ -266,7 +265,7 @@ with st.container(border=True):
         help="캠페인 데이터와 상품 데이터를 여러 파일 또는 하나의 엑셀 파일 내 여러 시트로 올릴 수 있습니다.",
     )
     st.markdown(
-        '<div class="privacy-note">업로드 파일은 보고서 집계를 위해 현재 세션의 메모리에서만 처리합니다. 앱 코드에는 파일 저장이나 외부 전송 기능이 없습니다.</div>',
+        '<div class="privacy-note">업로드 파일은 Streamlit 서버의 현재 세션 메모리에서 처리되며, 앱은 파일을 별도로 저장하거나 다른 서비스로 재전송하지 않습니다.</div>',
         unsafe_allow_html=True,
     )
     sample_clicked = st.button("샘플 보고서 보기", use_container_width=True)
@@ -388,5 +387,4 @@ if report:
         )
     with download_columns[1]:
         st.info("아래 보고서의 ‘PDF로 저장 / 인쇄’를 누르면 PDF로 저장할 수 있습니다.")
-    components.html(html_report, height=1700, scrolling=True)
-
+    st.iframe(html_report, height="content")

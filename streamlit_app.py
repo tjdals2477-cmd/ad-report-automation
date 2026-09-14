@@ -8,24 +8,37 @@ from typing import Any
 
 import streamlit as st
 
-from report_engine import Dataset, build_report, read_upload
+from report_engine import Dataset, build_report, find_column, read_upload
 
 
 BASE_DIR = Path(__file__).resolve().parent
 CAMPAIGN_FIELDS = [
     ("campaign", "캠페인명", True),
     ("spend", "광고비", True),
-    ("sales", "매출", True),
-    ("clicks", "클릭수", False),
-    ("orders", "주문수 / 전환수", False),
-    ("conversion_rate", "전환율", False),
+    ("clicks", "클릭수", True),
 ]
 PRODUCT_FIELDS = [
     ("option_id", "옵션 ID", False),
     ("product_name", "상품명", True),
-    ("sales", "매출액", True),
-    ("quantity", "판매 수량", False),
 ]
+CAMPAIGN_SCORE_FIELDS = [
+    *CAMPAIGN_FIELDS,
+    ("sales", "매출", True),
+    ("orders", "주문수 / 전환수", True),
+]
+PRODUCT_SCORE_FIELDS = [
+    *PRODUCT_FIELDS,
+    ("sales", "매출액", True),
+    ("quantity", "판매 수량", True),
+]
+
+ORDERS_14D_ALIASES = ["총 주문수(14일)", "총주문수(14일)", "총 주문수 14일"]
+SALES_14D_ALIASES = [
+    "총 전환 매출액(14일)",
+    "총 전환 매출액(14일)(원)",
+    "총 전환 매출(14일)",
+]
+QUANTITY_14D_ALIASES = ["총 판매 수량(14일)", "총판매수량(14일)", "총 판매수량 14일"]
 
 
 st.set_page_config(
@@ -280,8 +293,8 @@ if sample_clicked:
         ]
     )
     sample_datasets, _ = parse_files(sample_payloads)
-    campaign_sample = max(sample_datasets, key=lambda item: score_dataset(item, CAMPAIGN_FIELDS))
-    product_sample = max(sample_datasets, key=lambda item: score_dataset(item, PRODUCT_FIELDS))
+    campaign_sample = max(sample_datasets, key=lambda item: score_dataset(item, CAMPAIGN_SCORE_FIELDS))
+    product_sample = max(sample_datasets, key=lambda item: score_dataset(item, PRODUCT_SCORE_FIELDS))
     st.session_state["report"] = build_report(
         campaign_sample,
         product_sample,
@@ -322,7 +335,7 @@ if datasets:
             report_title = st.text_input("보고서 제목", value="광고 성과 리포트")
 
         dataset_by_id = {dataset.dataset_id: dataset for dataset in datasets}
-        campaign_default = best_dataset_id(datasets, CAMPAIGN_FIELDS)
+        campaign_default = best_dataset_id(datasets, CAMPAIGN_SCORE_FIELDS)
         campaign_ids = list(dataset_by_id)
         st.markdown('<div class="section-label">캠페인 데이터</div>', unsafe_allow_html=True)
         campaign_id = st.selectbox(
@@ -332,8 +345,30 @@ if datasets:
             format_func=lambda value: dataset_label(dataset_by_id[value]),
         )
         campaign_mapping = mapping_widgets(dataset_by_id[campaign_id], CAMPAIGN_FIELDS, "campaign")
+        campaign_sales_14d_column = find_column(
+            dataset_by_id[campaign_id].columns, SALES_14D_ALIASES
+        )
+        orders_14d_column = find_column(dataset_by_id[campaign_id].columns, ORDERS_14D_ALIASES)
+        campaign_mapping["sales"] = campaign_sales_14d_column
+        campaign_mapping["orders"] = orders_14d_column
+        campaign_mapping["conversion_rate"] = None
+        if campaign_sales_14d_column and orders_14d_column:
+            st.info(
+                f"자동 연결: 매출 → {campaign_sales_14d_column} · 주문수/전환수 → {orders_14d_column} · "
+                f"전환율 → {orders_14d_column} ÷ 클릭수 × 100"
+            )
+        else:
+            missing_campaign_auto = []
+            if not campaign_sales_14d_column:
+                missing_campaign_auto.append("총 전환 매출액(14일)")
+            if not orders_14d_column:
+                missing_campaign_auto.append("총 주문수(14일)")
+            st.error(
+                f"자동 연결할 열을 찾지 못했습니다: {', '.join(missing_campaign_auto)}. "
+                "원본 파일의 열 이름을 확인해주세요."
+            )
 
-        product_default = best_dataset_id(datasets, PRODUCT_FIELDS)
+        product_default = best_dataset_id(datasets, PRODUCT_SCORE_FIELDS)
         st.markdown('<div class="section-label">상품 데이터</div>', unsafe_allow_html=True)
         product_id = st.selectbox(
             "상품 TOP 10에 사용할 시트",
@@ -342,8 +377,32 @@ if datasets:
             format_func=lambda value: dataset_label(dataset_by_id[value]),
         )
         product_mapping = mapping_widgets(dataset_by_id[product_id], PRODUCT_FIELDS, "product")
+        product_sales_14d_column = find_column(dataset_by_id[product_id].columns, SALES_14D_ALIASES)
+        product_quantity_14d_column = find_column(dataset_by_id[product_id].columns, QUANTITY_14D_ALIASES)
+        product_mapping["sales"] = product_sales_14d_column
+        product_mapping["quantity"] = product_quantity_14d_column
+        auto_product_items = [
+            f"매출액 → {product_sales_14d_column or '총 전환 매출액(14일) 열 없음'}",
+            f"판매 수량 → {product_quantity_14d_column or '총 판매 수량(14일) 열 없음'}",
+        ]
+        st.info("자동 연결: " + " · ".join(auto_product_items))
 
-        if st.button("보고서 생성", type="primary", use_container_width=True):
+        missing_auto_columns = []
+        if not campaign_sales_14d_column:
+            missing_auto_columns.append("캠페인 총 전환 매출액(14일)")
+        if not orders_14d_column:
+            missing_auto_columns.append("총 주문수(14일)")
+        if not product_sales_14d_column:
+            missing_auto_columns.append("상품 총 전환 매출액(14일)")
+        if not product_quantity_14d_column:
+            missing_auto_columns.append("총 판매 수량(14일)")
+
+        if st.button(
+            "보고서 생성",
+            type="primary",
+            use_container_width=True,
+            disabled=bool(missing_auto_columns),
+        ):
             missing = [
                 label
                 for field, label, required in [*CAMPAIGN_FIELDS, *PRODUCT_FIELDS]

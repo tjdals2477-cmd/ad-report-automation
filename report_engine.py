@@ -28,6 +28,8 @@ ALIASES = {
         "cost",
     ],
     "sales": [
+        "총전환매출액14일",
+        "총전환매출14일",
         "광고매출액",
         "광고매출",
         "전환매출액",
@@ -41,6 +43,7 @@ ALIASES = {
     ],
     "clicks": ["클릭수", "클릭", "유입수", "clicks", "click"],
     "orders": [
+        "총주문수14일",
         "구매수",
         "주문수",
         "전환수",
@@ -76,6 +79,7 @@ ALIASES = {
         "itemname",
     ],
     "quantity": [
+        "총판매수량14일",
         "판매수량",
         "주문수량",
         "구매수량",
@@ -211,8 +215,15 @@ def detect_columns(columns: list[str]) -> dict[str, str | None]:
     result: dict[str, str | None] = {}
     for field, aliases in ALIASES.items():
         normalized_aliases = [_normalize_header(alias) for alias in aliases]
+        # Alias order is meaningful. Specific 14-day metrics must win over
+        # generic partial matches such as "전환매출" or "총주문수".
         exact = next(
-            (column for column, value in normalized.items() if value in normalized_aliases),
+            (
+                column
+                for alias in normalized_aliases
+                for column, value in normalized.items()
+                if value == alias
+            ),
             None,
         )
         if exact:
@@ -221,13 +232,29 @@ def detect_columns(columns: list[str]) -> dict[str, str | None]:
         partial = next(
             (
                 column
+                for alias in normalized_aliases
                 for column, value in normalized.items()
-                if any(alias and alias in value for alias in normalized_aliases)
+                if alias and alias in value
             ),
             None,
         )
         result[field] = partial
     return result
+
+
+def find_column(columns: list[str], aliases: list[str]) -> str | None:
+    """Find a column by ordered aliases without falling back to other metrics."""
+    normalized = {column: _normalize_header(column) for column in columns}
+    normalized_aliases = [_normalize_header(alias) for alias in aliases]
+    for alias in normalized_aliases:
+        for column, value in normalized.items():
+            if value == alias:
+                return column
+    for alias in normalized_aliases:
+        for column, value in normalized.items():
+            if alias and alias in value:
+                return column
+    return None
 
 
 def _number(value: Any) -> float:

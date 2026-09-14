@@ -262,9 +262,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown('<div class="hero-kicker">WEEKLY / MONTHLY PERFORMANCE</div>', unsafe_allow_html=True)
-st.markdown('<h1 class="hero-title">광고 데이터를<br>읽기 쉬운 보고서로.</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="hero-title">보고용 광고 데이터로<br>전환.</h1>', unsafe_allow_html=True)
 st.markdown(
-    '<p class="hero-copy">엑셀이나 CSV를 올리면 KPI, 캠페인 성과, 판매상품 TOP 10을 자동으로 집계합니다. 열 이름이 달라도 화면에서 바로 연결할 수 있습니다.</p>',
+    '<p class="hero-copy">최적화 파일: 쿠팡 ‘매출 성장 광고 보고서’ · 보고서 구조 ‘캠페인 &gt; 광고그룹 &gt; 상품’</p>',
     unsafe_allow_html=True,
 )
 

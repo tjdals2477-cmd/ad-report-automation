@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import html
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,8 @@ from report_engine import Dataset, build_report, find_column, read_upload
 
 
 BASE_DIR = Path(__file__).resolve().parent
+EDITOR_CSS = (BASE_DIR / "static" / "report-editor.css").read_text(encoding="utf-8")
+EDITOR_JS = (BASE_DIR / "static" / "report-editor.js").read_text(encoding="utf-8")
 CAMPAIGN_FIELDS = [
     ("campaign", "캠페인명", True),
     ("spend", "광고비", True),
@@ -90,6 +93,19 @@ def esc(value: Any) -> str:
 
 def money(value: Any) -> str:
     return f"{round(float(value or 0)):,}원"
+
+
+def optional_money(value: Any) -> str:
+    return "—" if value is None else money(value)
+
+
+def parse_total_sales(value: str) -> int | None:
+    cleaned = value.replace(",", "").replace(" ", "").removesuffix("원")
+    if not cleaned:
+        return None
+    if not re.fullmatch(r"\d+", cleaned):
+        raise ValueError("총매출에는 0 이상의 원화 금액을 입력해주세요.")
+    return int(cleaned)
 
 
 def number(value: Any) -> str:
@@ -197,7 +213,7 @@ def render_report_html(report: dict[str, Any], standalone: bool = False) -> str:
 <style>
   * {{ box-sizing:border-box; }}
   body {{ margin:0; padding:18px; background:#f3f5f8; color:#101827; font-family:"Pretendard","Noto Sans KR","Malgun Gothic",Arial,sans-serif; }}
-  .actions {{ max-width:1120px; margin:0 auto 10px; display:flex; justify-content:flex-end; }}
+  .actions {{ max-width:1120px; margin:0 auto 10px; display:flex; justify-content:flex-start; }}
   .print-button {{ min-height:42px; padding:0 18px; border:0; border-radius:10px; background:#101827; color:white; font:700 13px inherit; cursor:pointer; }}
   .report {{ max-width:1120px; margin:auto; padding:48px 50px 24px; background:white; border:1px solid #e3e8ef; box-shadow:0 18px 50px rgba(25,37,56,.08); }}
   .head {{ display:flex; justify-content:space-between; align-items:flex-end; gap:24px; padding-bottom:22px; border-bottom:2px solid #101827; }}
@@ -205,9 +221,9 @@ def render_report_html(report: dict[str, Any], standalone: bool = False) -> str:
   h1 {{ margin:0; font-size:28px; letter-spacing:-.045em; }}
   .period {{ text-align:right; }} .period span {{ display:block; color:#667085; font-size:8px; font-weight:800; letter-spacing:.13em; }}
   .period strong {{ display:block; margin-top:7px; font-size:13px; }}
-  .kpis {{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:22px; }}
+  .kpis {{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-top:22px; }}
   .kpi {{ min-height:118px; display:flex; flex-direction:column; justify-content:space-between; padding:17px; border:1px solid #edf0f4; border-radius:12px; background:#f6f8fb; }}
-  .kpi span {{ color:#344054; font-size:11px; font-weight:700; }} .kpi strong {{ margin:13px 0 8px; font-size:24px; letter-spacing:-.045em; white-space:nowrap; }}
+  .kpi span {{ color:#344054; font-size:11px; font-weight:700; }} .kpi strong {{ margin:13px 0 8px; font-size:clamp(15px,2vw,24px); letter-spacing:-.045em; white-space:nowrap; }}
   .kpi small {{ color:#98a2b3; font-size:7px; font-weight:800; letter-spacing:.12em; }}
   .kpi.primary {{ color:white; background:#2463eb; border-color:#2463eb; }} .kpi.primary span,.kpi.primary small {{ color:rgba(255,255,255,.78); }}
   .ratio {{ display:grid; grid-template-columns:auto 1fr auto; align-items:baseline; gap:14px; margin-top:10px; padding:13px 16px; border-radius:10px; background:#101827; color:white; }}
@@ -222,25 +238,29 @@ def render_report_html(report: dict[str, Any], standalone: bool = False) -> str:
   .share {{ display:inline-flex; align-items:center; justify-content:flex-end; gap:7px; width:100%; }} .share i {{ width:38px; height:4px; background:#e9edf3; border-radius:8px; overflow:hidden; }}
   .share b {{ display:block; height:100%; background:#2463eb; }} .empty {{ padding:24px; text-align:center; color:#667085; }}
   footer {{ display:flex; justify-content:space-between; gap:18px; margin-top:30px; padding-top:12px; border-top:1px solid #e3e8ef; color:#98a2b3; font-size:7px; }}
+  @media(max-width:820px) {{ .kpis {{ grid-template-columns:repeat(3,minmax(0,1fr)); }} }}
   @media(max-width:700px) {{ body {{ padding:0; }} .actions {{ padding:10px; margin:0; }} .report {{ padding:28px 15px 18px; border:0; }} .head {{ align-items:flex-start; flex-direction:column; }} .period {{ text-align:left; }} .kpis {{ grid-template-columns:1fr 1fr; }} .ratio {{ grid-template-columns:1fr auto; }} .ratio small {{ grid-column:1/-1; }} }}
   @media(max-width:440px) {{ .kpis {{ grid-template-columns:1fr; }} }}
-  @media print {{ @page {{ size:A4; margin:9mm; }} body {{ padding:0; background:white; }} .actions {{ display:none; }} .report {{ max-width:none; padding:0; border:0; box-shadow:none; }} .head {{ padding-bottom:14px; }} .kpis {{ margin-top:14px; gap:7px; }} .kpi {{ min-height:88px; padding:12px; print-color-adjust:exact; -webkit-print-color-adjust:exact; }} .kpi strong {{ margin:8px 0 5px; font-size:18px; }} .ratio {{ margin-top:7px; padding:9px 12px; print-color-adjust:exact; -webkit-print-color-adjust:exact; }} section {{ margin-top:23px; }} th {{ padding:6px 7px; print-color-adjust:exact; -webkit-print-color-adjust:exact; }} td {{ padding:6px 7px; font-size:8px; }} tr {{ break-inside:avoid; }} footer {{ margin-top:16px; }} }}
+  @media print {{ @page {{ size:A4; margin:9mm; }} body {{ padding:0; background:white; }} .actions {{ display:none; }} .report {{ max-width:none; padding:0; border:0; box-shadow:none; }} .head {{ padding-bottom:14px; }} .kpis {{ grid-template-columns:repeat(5,minmax(0,1fr)); margin-top:14px; gap:7px; }} .kpi {{ min-height:88px; padding:9px; print-color-adjust:exact; -webkit-print-color-adjust:exact; }} .kpi strong {{ margin:8px 0 5px; font-size:14px; }} .ratio {{ margin-top:7px; padding:9px 12px; print-color-adjust:exact; -webkit-print-color-adjust:exact; }} section {{ margin-top:23px; }} th {{ padding:6px 7px; print-color-adjust:exact; -webkit-print-color-adjust:exact; }} td {{ padding:6px 7px; font-size:8px; }} tr {{ break-inside:avoid; }} footer {{ margin-top:16px; }} }}
 </style>
+<style>{EDITOR_CSS}</style>
+<style>#report-editor-bar{{position:static!important;inset:auto!important;width:auto!important;max-width:1120px;margin:0 auto 10px;justify-content:flex-end}}@media(max-width:700px){{#report-editor-bar{{margin:0 10px 10px}}}}</style>
 </head>
 <body>
   <div class="actions">{print_button}</div>
-  <article class="report">
+  <article class="report" data-report-root>
     <header class="head">
       <div><p class="kicker">{kicker}</p><h1>{esc(report['meta']['reportTitle'])}</h1></div>
-      <div class="period"><span>REPORTING PERIOD</span><strong>{esc(report['meta']['periodLabel'])}</strong></div>
+      <div class="period"><span>REPORTING PERIOD</span><strong data-report-editable>{esc(report['meta']['periodLabel'])}</strong></div>
     </header>
     <div class="kpis">
-      <div class="kpi"><span>총광고비</span><strong>{money(report['kpis']['totalSpend'])}</strong><small>AD SPEND</small></div>
-      <div class="kpi"><span>총매출</span><strong>{money(report['kpis']['totalSales'])}</strong><small>AD SALES</small></div>
-      <div class="kpi"><span>전환율</span><strong>{percent(report['kpis']['conversionRate'])}</strong><small>CONVERSION RATE</small></div>
-      <div class="kpi primary"><span>ROAS</span><strong>{percent(report['kpis']['roas'])}</strong><small>RETURN ON AD SPEND</small></div>
+      <div class="kpi"><span data-report-editable>총광고비</span><strong data-report-editable>{money(report['kpis']['totalSpend'])}</strong><small>AD SPEND</small></div>
+      <div class="kpi"><span data-report-editable>광고전환 매출</span><strong data-report-editable>{money(report['kpis']['adConversionSales'])}</strong><small>14-DAY AD SALES</small></div>
+      <div class="kpi"><span data-report-editable>총매출</span><strong data-report-editable>{optional_money(report['kpis']['totalSales'])}</strong><small>TOTAL SALES · MANUAL</small></div>
+      <div class="kpi"><span data-report-editable>전환율</span><strong data-report-editable>{percent(report['kpis']['conversionRate'])}</strong><small>CONVERSION RATE</small></div>
+      <div class="kpi primary"><span data-report-editable>ROAS</span><strong data-report-editable>{percent(report['kpis']['roas'])}</strong><small>RETURN ON AD SPEND</small></div>
     </div>
-    <div class="ratio"><span>광고 매출 대비 광고비</span><strong>{percent(report['kpis']['spendToSales'])}</strong><small>총광고비 ÷ 총매출</small></div>
+    <div class="ratio"><span data-report-editable>광고전환 매출 대비 광고비</span><strong data-report-editable>{percent(report['kpis']['spendToSales'])}</strong><small>총광고비 ÷ 광고전환 매출</small></div>
     <section>
       <div class="section-head"><div class="section-title"><span>01</span><h2>캠페인별 매출 요약</h2></div><p>매출액 기준 내림차순</p></div>
       <div class="table-wrap"><table><thead><tr><th>캠페인</th><th class="num">광고비</th><th class="num">매출</th><th class="num">전환율</th><th class="num">광고비 비중</th></tr></thead><tbody>{campaign_rows}</tbody></table></div>
@@ -251,6 +271,7 @@ def render_report_html(report: dict[str, Any], standalone: bool = False) -> str:
     </section>
     <footer><span>SOURCE · {esc(source_names)}</span><span>GENERATED · {generated}</span></footer>
   </article>
+  <script>{EDITOR_JS}</script>
 </body>
 </html>
 """
@@ -300,7 +321,7 @@ if sample_clicked:
         product_sample,
         campaign_sample.public_summary()["detected"],
         product_sample.public_summary()["detected"],
-        {"periodType": "monthly", "periodLabel": "2026년 8월", "reportTitle": "광고 성과 리포트"},
+        {"periodType": "monthly", "periodLabel": "2026년 8월", "reportTitle": "광고 성과 리포트", "totalSales": None},
     )
 
 
@@ -333,6 +354,18 @@ if datasets:
             period_label = st.text_input("대상 기간", placeholder="예: 2026년 8월")
         with meta_columns[2]:
             report_title = st.text_input("보고서 제목", value="광고 성과 리포트")
+        total_sales_text = st.text_input(
+            "총매출 (직접 입력 · 선택)",
+            placeholder="예: 120,000,000",
+            help="광고 외 매출을 포함한 전체 매출입니다. 비워두면 KPI에 —로 표시합니다.",
+        )
+        try:
+            total_sales_value = parse_total_sales(total_sales_text)
+            total_sales_error = False
+        except ValueError as exc:
+            st.error(str(exc))
+            total_sales_value = None
+            total_sales_error = True
 
         dataset_by_id = {dataset.dataset_id: dataset for dataset in datasets}
         campaign_default = best_dataset_id(datasets, CAMPAIGN_SCORE_FIELDS)
@@ -401,7 +434,7 @@ if datasets:
             "보고서 생성",
             type="primary",
             use_container_width=True,
-            disabled=bool(missing_auto_columns),
+            disabled=bool(missing_auto_columns) or total_sales_error,
         ):
             missing = [
                 label
@@ -422,6 +455,7 @@ if datasets:
                             "periodType": "weekly" if period_type_label == "주간" else "monthly",
                             "periodLabel": period_label or "기간 미지정",
                             "reportTitle": report_title,
+                            "totalSales": total_sales_value,
                         },
                     )
                 except ValueError as exc:
@@ -438,12 +472,12 @@ if report:
     download_columns = st.columns([1, 1])
     with download_columns[0]:
         st.download_button(
-            "독립 HTML 보고서 내려받기",
+            "원본 HTML 보고서 내려받기",
             data=html_report.encode("utf-8"),
             file_name="광고_성과_리포트.html",
             mime="text/html",
             use_container_width=True,
         )
     with download_columns[1]:
-        st.info("아래 보고서의 ‘PDF로 저장 / 인쇄’를 누르면 PDF로 저장할 수 있습니다.")
+        st.info("아래 보고서에서 ‘편집 켜기’ → ‘텍스트’를 누르면 내용을 고칠 수 있습니다. 수정본은 ‘HTML 저장’으로 받고, ‘PDF로 저장 / 인쇄’로 인쇄하세요. 편집은 원본 데이터에 반영되지 않습니다.")
     st.iframe(html_report, height="content")

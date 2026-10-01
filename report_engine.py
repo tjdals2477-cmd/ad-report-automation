@@ -361,7 +361,14 @@ def build_report(
                 group["rateWeight"] += clicks
 
     total_spend = sum(group["spend"] for group in campaign_groups.values())
-    total_sales = sum(group["sales"] for group in campaign_groups.values())
+    ad_conversion_sales = sum(group["sales"] for group in campaign_groups.values())
+    # The legacy local form has no total-sales input. Keep its existing value
+    # until that form is updated; the Streamlit form passes the key explicitly.
+    if "totalSales" in meta:
+        total_sales_input = meta["totalSales"]
+        total_sales = round(float(total_sales_input)) if total_sales_input is not None else None
+    else:
+        total_sales = round(ad_conversion_sales)
     total_clicks = sum(group["clicks"] for group in campaign_groups.values())
     total_orders = sum(group["orders"] for group in campaign_groups.values())
     total_rate_weighted = sum(group["rateWeightedSum"] for group in campaign_groups.values())
@@ -432,10 +439,11 @@ def build_report(
         },
         "kpis": {
             "totalSpend": round(total_spend),
-            "totalSales": round(total_sales),
+            "adConversionSales": round(ad_conversion_sales),
+            "totalSales": total_sales,
             "conversionRate": conversion_rate,
-            "roas": (total_sales / total_spend * 100) if total_spend else None,
-            "spendToSales": (total_spend / total_sales * 100) if total_sales else None,
+            "roas": (ad_conversion_sales / total_spend * 100) if total_spend else None,
+            "spendToSales": (total_spend / ad_conversion_sales * 100) if ad_conversion_sales else None,
         },
         "campaigns": campaigns,
         "products": products[:10],

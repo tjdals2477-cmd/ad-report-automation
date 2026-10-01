@@ -23,6 +23,7 @@ CAMPAIGN_FIELDS = [
 PRODUCT_FIELDS = [
     ("option_id", "옵션 ID", False),
     ("product_name", "상품명", True),
+    ("campaign", "캠페인명", False),
 ]
 CAMPAIGN_SCORE_FIELDS = [
     *CAMPAIGN_FIELDS,
@@ -199,13 +200,14 @@ def render_report_html(report: dict[str, Any], standalone: bool = False) -> str:
         <tr>
           <td class="rank">{index:02d}</td>
           <td>{esc(row['optionId'])}</td>
+          <td class="campaign-names">{"<br>".join(esc(name) for name in row.get('campaignNames', [])) or '—'}</td>
           <td class="name">{esc(row['productName'])}</td>
           <td class="num">{number(row['sales'])}</td>
           <td class="num">{number(row['quantity'])}</td>
         </tr>
         """
         for index, row in enumerate(report["products"], 1)
-    ) or '<tr><td colspan="5" class="empty">표시할 상품 데이터가 없습니다.</td></tr>'
+    ) or '<tr><td colspan="6" class="empty">표시할 상품 데이터가 없습니다.</td></tr>'
 
     generated = datetime.now().strftime("%Y.%m.%d %H:%M")
     source_names = ", ".join(report["meta"]["sourceNames"])
@@ -244,6 +246,7 @@ def render_report_html(report: dict[str, Any], standalone: bool = False) -> str:
   th {{ padding:10px 11px; border-top:1px solid #101827; border-bottom:1px solid #101827; background:#f7f8fa; color:#344054; text-align:left; font-size:9px; }}
   td {{ padding:10px 11px; border-bottom:1px solid #e3e8ef; color:#344054; font-size:10px; line-height:1.35; }}
   td.name {{ color:#101827; font-weight:700; }} .num {{ text-align:right; }} .rank {{ width:50px; text-align:center; }}
+  td.campaign-names {{ overflow-wrap:anywhere; line-height:1.5; }}
   .share {{ display:inline-flex; align-items:center; justify-content:flex-end; gap:7px; width:100%; }} .share i {{ width:38px; height:4px; background:#e9edf3; border-radius:8px; overflow:hidden; }}
   .share b {{ display:block; height:100%; background:#2463eb; }} .empty {{ padding:24px; text-align:center; color:#667085; }}
   footer {{ display:flex; justify-content:space-between; gap:18px; margin-top:30px; padding-top:12px; border-top:1px solid #e3e8ef; color:#98a2b3; font-size:7px; }}
@@ -276,7 +279,7 @@ def render_report_html(report: dict[str, Any], standalone: bool = False) -> str:
     </section>
     <section>
       <div class="section-head"><div class="section-title"><span>02</span><h2>판매상품 TOP 10</h2></div><p>매출액 기준 상위 10개 상품</p></div>
-      <div class="table-wrap"><table><thead><tr><th class="rank">순위</th><th>옵션 ID</th><th>상품명</th><th class="num">매출액</th><th class="num">판매 수량</th></tr></thead><tbody>{product_rows}</tbody></table></div>
+      <div class="table-wrap"><table class="product-table"><colgroup><col style="width:5%"><col style="width:13%"><col style="width:22%"><col style="width:36%"><col style="width:14%"><col style="width:10%"></colgroup><thead><tr><th class="rank">순위</th><th>옵션 ID</th><th>캠페인명</th><th>상품명</th><th class="num">매출액</th><th class="num">판매 수량</th></tr></thead><tbody>{product_rows}</tbody></table></div>
     </section>
     <footer><span>SOURCE · {esc(source_names)}</span><span>GENERATED · {generated}</span></footer>
   </article>

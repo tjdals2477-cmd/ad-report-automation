@@ -396,23 +396,39 @@ def build_report(
         )
     campaigns.sort(key=lambda item: (-item["sales"], item["campaign"]))
 
-    product_groups: dict[tuple[str, str], dict[str, float]] = defaultdict(
-        lambda: {"sales": 0.0, "quantity": 0.0}
+    product_groups: dict[tuple[str, str], dict[str, Any]] = defaultdict(
+        lambda: {"sales": 0.0, "quantity": 0.0, "campaignSales": defaultdict(float)}
     )
     for row in product_dataset.rows:
         product_name = _text(_mapped_value(row, product_mapping, "product_name"))
         if not product_name:
             continue
-        option_id = _text(_mapped_value(row, product_mapping, "option_id"), "-")
+        raw_option_id = _mapped_value(row, product_mapping, "option_id")
+        option_id = (
+            str(int(raw_option_id))
+            if isinstance(raw_option_id, float) and raw_option_id.is_integer()
+            else _text(raw_option_id, "-")
+        )
         key = (option_id, product_name)
-        product_groups[key]["sales"] += _number(_mapped_value(row, product_mapping, "sales"))
+        row_sales = _number(_mapped_value(row, product_mapping, "sales"))
+        product_groups[key]["sales"] += row_sales
         product_groups[key]["quantity"] += _number(
             _mapped_value(row, product_mapping, "quantity")
         )
+        campaign_name = _text(_mapped_value(row, product_mapping, "campaign"))
+        if campaign_name:
+            product_groups[key]["campaignSales"][campaign_name] += row_sales
 
     products = [
         {
             "optionId": option_id,
+            "campaignNames": [
+                name
+                for name, sales in sorted(
+                    values["campaignSales"].items(), key=lambda item: (-item[1], item[0])
+                )
+                if sales > 0
+            ] or sorted(values["campaignSales"]),
             "productName": product_name,
             "sales": round(values["sales"]),
             "quantity": round(values["quantity"]),

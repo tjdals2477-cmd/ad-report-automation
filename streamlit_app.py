@@ -108,6 +108,15 @@ def parse_total_sales(value: str) -> int | None:
     return int(cleaned)
 
 
+def set_report_sales_kpis(report: dict[str, Any], total_sales: int | None) -> dict[str, Any]:
+    """Keep reports created before deployment compatible with the new KPI cards."""
+    report["kpis"]["adConversionSales"] = round(
+        sum(row["sales"] for row in report["campaigns"])
+    )
+    report["kpis"]["totalSales"] = total_sales
+    return report
+
+
 def number(value: Any) -> str:
     return f"{round(float(value or 0)):,}"
 
@@ -316,12 +325,15 @@ if sample_clicked:
     sample_datasets, _ = parse_files(sample_payloads)
     campaign_sample = max(sample_datasets, key=lambda item: score_dataset(item, CAMPAIGN_SCORE_FIELDS))
     product_sample = max(sample_datasets, key=lambda item: score_dataset(item, PRODUCT_SCORE_FIELDS))
-    st.session_state["report"] = build_report(
-        campaign_sample,
-        product_sample,
-        campaign_sample.public_summary()["detected"],
-        product_sample.public_summary()["detected"],
-        {"periodType": "monthly", "periodLabel": "2026년 8월", "reportTitle": "광고 성과 리포트", "totalSales": None},
+    st.session_state["report"] = set_report_sales_kpis(
+        build_report(
+            campaign_sample,
+            product_sample,
+            campaign_sample.public_summary()["detected"],
+            product_sample.public_summary()["detected"],
+            {"periodType": "monthly", "periodLabel": "2026년 8월", "reportTitle": "광고 성과 리포트", "totalSales": None},
+        ),
+        None,
     )
 
 
@@ -446,17 +458,20 @@ if datasets:
                 st.error(f"필수 열을 선택해주세요: {', '.join(dict.fromkeys(missing))}")
             else:
                 try:
-                    st.session_state["report"] = build_report(
-                        dataset_by_id[campaign_id],
-                        dataset_by_id[product_id],
-                        campaign_mapping,
-                        product_mapping,
-                        {
-                            "periodType": "weekly" if period_type_label == "주간" else "monthly",
-                            "periodLabel": period_label or "기간 미지정",
-                            "reportTitle": report_title,
-                            "totalSales": total_sales_value,
-                        },
+                    st.session_state["report"] = set_report_sales_kpis(
+                        build_report(
+                            dataset_by_id[campaign_id],
+                            dataset_by_id[product_id],
+                            campaign_mapping,
+                            product_mapping,
+                            {
+                                "periodType": "weekly" if period_type_label == "주간" else "monthly",
+                                "periodLabel": period_label or "기간 미지정",
+                                "reportTitle": report_title,
+                                "totalSales": total_sales_value,
+                            },
+                        ),
+                        total_sales_value,
                     )
                 except ValueError as exc:
                     st.error(str(exc))
@@ -464,6 +479,8 @@ if datasets:
 
 report = st.session_state.get("report")
 if report:
+    if "adConversionSales" not in report["kpis"]:
+        report = set_report_sales_kpis(report, None)
     st.markdown('<div class="success-title">완성된 보고서</div>', unsafe_allow_html=True)
     st.caption(
         f"캠페인 {report['quality']['campaignRows']:,}행 · 상품 {report['quality']['productRows']:,}행 · 전환율: {report['quality']['conversionMethod']}"
